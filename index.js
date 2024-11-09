@@ -77,7 +77,7 @@ function convertToUploadableFile (percorsoFile, dataArrivo) {
     const comuni = csvToJson.utf8Encoding().fieldDelimiter(',').supportQuotedField(true).getJsonFromCsv("assets/comuni.csv")
     const documenti = csvToJson.utf8Encoding().fieldDelimiter(',').supportQuotedField(true).getJsonFromCsv("assets/documenti.csv")
     
-    const cutAndTrim = (str) => str.split("/")[0].trim();
+    const cutAndTrim = (str) => str.split("/")[1].trim();
 
     let filtered = datas.filter(x => x["Arrivo"] == dataArrivo);
 
