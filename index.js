@@ -6,13 +6,20 @@ const fs = require("node:fs");
 const axios = require('axios');
 const Readable = require('stream').Readable;
 
-
 const bot = new Telegraf(process.env.BOT_TOKEN);
 bot.start((ctx) => ctx.reply('Welcome'));
 
-const bnbTable = {
-    "52206419": "Mestre"
-}
+const loadRegistered = () => fs.readFileSync('.envRegistration').toString().split("\n")
+    .reduce((bnbT, x) => {
+        if (x)
+            bnbT[x.split(" ")[0]] ??= x.split(" ")[1]; 
+        return bnbT; 
+    }, {});
+
+const isAscii = str => /^[\x00-\x7F]+$/.test(str);
+const ERROR_ASCII = "Riga contenente caratteri invalidi";
+
+let bnbTable = loadRegistered();
 
 bot.on(message("document"), async (ctx) => {
     const fileUrl = await ctx.telegram.getFileLink(ctx.update.message.document.file_id);
@@ -29,13 +36,19 @@ bot.on(message("text"), (ctx) => {
                 ctx.sendMessage(`Per questa data hanno compilato ${countGuestsForDate(`${bnbTable[ctx.chat.id]}.csv`, ctx.update.message.text.split(" ")[1])} persone`)
         }
     }
+    else if (ctx.update.message.text.startsWith("register ")) {
+        fs.appendFileSync('.envRegistration', `\n${ctx.chat.id} ${ctx.update.message.text.replace("register ", "")}`);
+        bnbTable = loadRegistered();
+    }
     else {
         const dateElement = ctx.update.message.text.split("/");
         if (dateElement.length >= 3) {
             const date = `${dateElement[1]}/${dateElement[0]}/${dateElement[2]}`;
             if (!isNaN(Date.parse(date))) {
                 const textToSend = convertToUploadableFile(`${bnbTable[ctx.chat.id]}.csv`, ctx.update.message.text);
-                if (textToSend)
+                if (textToSend.startsWith(ERROR_ASCII))
+                    ctx.sendMessage(`${ERROR_ASCII} Riga ${textToSend.replace(ERROR_ASCII, "")}`);
+                else if (textToSend)
                     ctx.replyWithDocument({source: Readable.from(textToSend), filename: `${bnbTable[ctx.chat.id]}-${ctx.update.message.text.replaceAll("/", "-")}.txt`});
                 else
                     ctx.sendMessage("Nessuna registrazione per questa data.")
@@ -67,10 +80,13 @@ function convertToUploadableFile (percorsoFile, dataArrivo) {
     const cutAndTrim = (str) => str.split("/")[0].trim();
 
     let filtered = datas.filter(x => x["Arrivo"] == dataArrivo);
-        
+
     let rowToWrite = "";
     
     filtered.forEach((el, i) => {
+        if (!isAscii(r["Nome"]) || !isAscii(r["Cognome"]) || !isAscii(r["NumeroDocumento"]))
+            return ERROR_ASCII + i;
+
         rowToWrite += i == 0 ? "" : "\n";
         
         rowToWrite += i == 0 ? "18" : "20";
